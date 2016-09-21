@@ -1,4 +1,4 @@
-object MainRefactored {
+object OptionToEither {
 
   case class Address(id: Int, name: String, postalCode: Option[String])
 
