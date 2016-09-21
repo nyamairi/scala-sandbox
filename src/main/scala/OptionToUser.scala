@@ -1,4 +1,4 @@
-object MainBefore {
+object MainRefactored {
 
   case class Address(id: Int, name: String, postalCode: Option[String])
 
@@ -29,31 +29,29 @@ object MainBefore {
 
   case object AddressNotHasPostalCode extends Failure
 
-  def findUser(userId: Int): Option[User] = {
-    userDatabase.get(userId)
+  def findUser(userId: Int): Either[Failure, User] = {
+    userDatabase.get(userId).toRight(UserNotFound)
   }
 
-  def findAddress(addressId: Int): Option[Address] = {
-    addressDatabase.get(addressId)
+  def findAddress(user: User): Either[Failure, Address] = {
+    for {
+      addressId <- user.addressId.toRight(UserNotHasAddress).right
+      address <- addressDatabase.get(addressId).toRight(AddressNotFound).right
+    } yield address
+  }
+
+  def findPostalCode(address: Address): Either[Failure, String] = {
+    address.postalCode.toRight(AddressNotHasPostalCode)
   }
 
   def getPostalCodeResult(userId: Int): PostalCodeResult = {
-    findUser(userId) match {
-      case Some(user) =>
-        user.addressId match {
-          case Some(addressId) =>
-            findAddress(addressId) match {
-              case Some(address) =>
-                address.postalCode match {
-                  case Some(postalCode) => Success(postalCode)
-                  case None => AddressNotHasPostalCode
-                }
-              case None => AddressNotFound
-            }
-          case None => UserNotHasAddress
-        }
-      case None => UserNotFound
-    }
+    (
+      for {
+        user <- findUser(userId).right
+        address <- findAddress(user).right
+        postalCode <- findPostalCode(address).right
+      } yield Success(postalCode)
+      ).merge
   }
 
   def main(args: Array[String]): Unit = {
